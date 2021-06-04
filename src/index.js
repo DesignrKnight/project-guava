@@ -3,6 +3,9 @@ import express from 'express';
 import { ApolloServer } from 'apollo-server-express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
+import jwt from 'express-jwt';
+import jwks from 'jwks-rsa';
+import jwtAuthz from 'express-jwt-authz';
 // import csurf from 'csurf';
 
 // GraphQL Schema
@@ -41,7 +44,27 @@ const apolloServer = new ApolloServer({
 });
 
 // Attach Express Server with Apollo Server
-apolloServer.applyMiddleware({ app, path: '/', cors: corsOptions });
+apolloServer.applyMiddleware({ app, path: '/graphql', cors: corsOptions });
+
+const jwtCheck = jwt({
+  secret: jwks.expressJwtSecret({
+    cache: true,
+    rateLimit: true,
+    jwksRequestsPerMinute: 5,
+    jwksUri: 'https://signit.eu.auth0.com/.well-known/jwks.json',
+  }),
+  audience: 'https://signit-api.dscnitrourkela.org/',
+  issuer: 'https://signit.eu.auth0.com/',
+  algorithms: ['RS256'],
+});
+
+const checkPermissions = jwtAuthz(['custom:perm2'], {
+  customScopeKey: 'https://signit-api.dscnitrourkela.org/app_metadata',
+});
+
+app.get('/', jwtCheck, checkPermissions, (req, res) => {
+  res.send('Secured Resource');
+});
 
 // Start Express Server on defined port
 const PORT = process.env.PORT || 8000;
